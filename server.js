@@ -2,6 +2,8 @@ const express = require('express');
 const path = require('path');
 const app = express();
 
+const cors = require('cors');
+
 const connectDB = require('./config/db');
 connectDB();
 
@@ -12,6 +14,14 @@ app.use(express.json());
 
 // Where are all the static files kept
 app.use(express.static('public'));
+
+// CORS
+
+const corsOptions = {
+  origin: process.env.ALLOWED_CLIENTS.split(','),
+};
+
+app.use(cors(corsOptions));
 
 // Template Engines
 
