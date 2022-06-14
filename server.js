@@ -17,11 +17,11 @@ app.use(express.static('public'));
 
 // CORS
 
-const corsOptions = {
-  origin: process.env.ALLOWED_CLIENTS.split(','),
-};
+// const corsOptions = {
+//   origin: process.env.ALLOWED_CLIENTS.split(','),
+// };
 
-app.use(cors(corsOptions));
+app.use(cors());
 
 // Template Engines
 
