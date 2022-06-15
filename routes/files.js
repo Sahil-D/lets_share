@@ -29,76 +29,96 @@ const fileRouter = express.Router();
 
 // Upload file endpoint
 fileRouter.post('/', async (req, res) => {
-  // Store file
-  upload(req, res, async (err) => {
-    // Validating request
-    if (!req.file) {
+  try {
+    // Store file
+    upload(req, res, async (err) => {
+      // Validating request
+      if (!req.file) {
+        return res.json({
+          message: 'File not found',
+        });
+      }
+
+      if (err) {
+        return res.status(500).json({
+          message: err.message,
+        });
+      }
+
+      // Store the filename to DB
+      const file = new File({
+        filename: req.file.filename,
+        uuid: uuid4(),
+        path: req.file.path, // req.file comes after multer installation
+        size: req.file.size,
+      });
+
+      const response = await file.save();
       return res.json({
-        message: 'File not found',
+        file: `${process.env.APP_BASE_URL}/files/${response.uuid}`,
       });
-    }
-
-    if (err) {
-      return res.status(500).json({
-        message: err.message,
-      });
-    }
-
-    // Store the filename to DB
-    const file = new File({
-      filename: req.file.filename,
-      uuid: uuid4(),
-      path: req.file.path, // req.file comes after multer installation
-      size: req.file.size,
     });
-
-    const response = await file.save();
-    return res.json({
-      file: `${process.env.APP_BASE_URL}/files/${response.uuid}`,
+  } catch (err) {
+    return res.status(500).json({
+      error: err.message,
     });
-  });
+  }
 });
 
 fileRouter.post('/send', async (req, res) => {
-  const { uuid, emailTo, emailFrom } = req.body;
+  try {
+    const { uuid, emailTo, emailFrom } = req.body;
 
-  if (!uuid || !emailTo || !emailFrom) {
-    return res.status(422).json({ error: 'All fields are required' });
+    if (!uuid || !emailTo || !emailFrom) {
+      return res.status(422).json({ error: 'All fields are required' });
+    }
+
+    // Getting file from DB
+    const file = await File.findOne({ uuid: uuid });
+
+    if (!file) {
+      return res.status(500).json({ error: 'No file found' });
+    }
+
+    if (file.sender) {
+      return res.status(422).json({ error: 'File already sent' });
+    }
+
+    // Send Email
+    let mail_sent = await sendMail({
+      from: emailFrom,
+      to: emailTo,
+      subject: `File Shared by ${emailFrom} via Let's Share`,
+      text: '',
+      html: emailTemplate({
+        emailFrom,
+        downloadLink: `${process.env.APP_BASE_URL}/files/${uuid}`,
+        size: parseInt(file.size / 1000, 10) + 'KB',
+        expires: '24 hrs',
+      }),
+    });
+
+    if (mail_sent) {
+      // Save sender details
+      file.sender = emailFrom;
+      file.receiver = emailTo;
+
+      await file.save();
+
+      return res.json({
+        message: 'Mail Sent.',
+        success: true,
+      });
+    } else {
+      return res.json({
+        message: 'Error occured while sending email.',
+      });
+    }
+  } catch (err) {
+    return res.json({
+      message: 'Error occured while sending email.',
+    });
   }
-
-  // Getting file from DB
-  const file = await File.findOne({ uuid: uuid });
-
-  if (!file) {
-    return res.status(500).json({ error: 'No file found' });
-  }
-
-  if (!file.sender) {
-    return res.status(422).json({ error: 'File already sent' });
-  }
-
-  file.sender = emailFrom;
-  file.receiver = emailTo;
-
-  const response = await file.save();
-
-  // Send Email
-  sendMail({
-    from: emailFrom,
-    to: emailTo,
-    subject: "Let's Share",
-    text: '',
-    html: emailTemplate({
-      emailFrom,
-      downloadLink: `${process.env.APP_BASE_URL}/files/${response.uuid}`,
-      size: parseInt(file.size / 1000, 10) + 'KB',
-      expires: '24 hrs',
-    }),
-  });
-
-  return res.json({
-    message: 'Mail Sent.',
-  });
 });
 
 module.exports = fileRouter;

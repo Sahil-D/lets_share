@@ -1,6 +1,8 @@
 const nodemailer = require('nodemailer');
 
 async function sendMail({ from, to, subject, text, html }) {
+  console.log('Send mail request : ', { from, to });
+
   let transporter = nodemailer.createTransport({
     host: process.env.NODEMAILER_HOST,
     port: process.env.NODEMAILER_PORT,
@@ -12,14 +14,16 @@ async function sendMail({ from, to, subject, text, html }) {
   });
 
   let info = await transporter.sendMail({
-    from: `Let's Share User <${from}>`,
+    from: `Let's Share User Service`,
     to: to,
     subject: subject,
     text: text,
     html: html,
   });
 
-  console.log('Message sent : ', info.messageId);
+  console.log('Mail sent : ', info.messageId);
+  if (info.messageId) return true;
+  else return false;
 }
 
 module.exports = sendMail;
